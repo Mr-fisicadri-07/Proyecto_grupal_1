@@ -181,7 +181,7 @@ class SimonDiceApp:
             self.simon_lo_dijo = random.choice([True, False])
 
             if self.simon_lo_dijo:
-                self.label_orden.config(text=f"Simón dice: {texto_base}", fg="blue")
+                self.label_orden.config(text=f"Simón dice: {texto_base}", fg="black")
             else:
                 self.label_orden.config(text=f"{texto_base.capitalize()}", fg="black")
 
