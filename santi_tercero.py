@@ -247,10 +247,14 @@ class GameManager:
                 self._handle_keydown(event)
 
         keys = pygame.key.get_pressed()
-        if keys[pygame.K_UP]: self.angle = clamp(self.angle + 60 * dt, 0, 90)
-        if keys[pygame.K_DOWN]: self.angle = clamp(self.angle - 60 * dt, 0, 90)
+        MIN_ANGLE = 40.0 
+        
         if keys[pygame.K_RIGHT]: self.power = clamp(self.power + 300 * dt, 50, 1500)
         if keys[pygame.K_LEFT]: self.power = clamp(self.power - 300 * dt, 50, 1500)
+        if keys[pygame.K_UP]: 
+            self.angle = clamp(self.angle + 60 * dt, MIN_ANGLE, 90)
+        if keys[pygame.K_DOWN]: 
+            self.angle = clamp(self.angle - 60 * dt, MIN_ANGLE, 90)
 
     def _handle_keydown(self, event):
         if event.key == pygame.K_SPACE and self.projectile is None:
