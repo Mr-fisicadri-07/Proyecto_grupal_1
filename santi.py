@@ -1,272 +1,365 @@
-"""
-Juego del Cañón — Prototipo en Python (Pygame)
-
-Contenido del archivo:
-- Explicación paso a paso del flujo del juego.
-- Diagrama simple de la escena (ASCII).
-- Distribución de tareas para un equipo pequeño.
-- Estructura del código.
-- Prototipo completo en Pygame ejecutable.
-
-Requisitos:
-- Python 3.8+
-- pygame (`pip install pygame`)
-
-Controles:
-- Flechas ARRIBA/ABAJO: ajustar ángulo del cañón (grados).
-- Flechas DERECHA/IZQUIERDA: ajustar velocidad inicial (potencia).
-- Barra ESPACIADORA: disparar.
-- R: reiniciar bala/objetivo.
-- M: alternar diana móvil.
-- W: alternar viento.
-- A: alternar rozamiento del aire (drag).
-- T: alternar estela de la trayectoria.
-
-Flujo del juego:
-1) El jugador ve el cañón en la parte izquierda de la pantalla.
-2) Ajusta ángulo y velocidad inicial con las teclas.
-3) Pulsa ESPACIO para disparar: el programa inicia el temporizador del disparo.
-4) Cada frame (~1/60 s) se calcula la posición del proyectil usando física (velocidad, gravedad, opcional: viento y drag).
-5) Se dibuja el proyectil y (opcional) la estela completa.
-6) La pelota sigue su trayectoria parabólica hasta que: toca el suelo, sale de la pantalla, o golpea la diana/obstáculo.
-7) Si acierta → mostrar mensaje "¡Has acertado!" y aumentar puntuación si aplica.
-
-Diagrama simple (ASCII):
-+-----------------------------------------------+
-|                                               |
-|                 diana (target)                 |
-|                                               |
-|                                               |
-|                                               |
-|  CAÑÓN (izq) -> o===>                          |
-|                                               |
-+-----------------------------------------------+
-
-Distribución de tareas:
-- Física y motor de actualización: implementar física (gravedad, viento, drag) y colisiones.
-- Gráficos y UI: dibujar cañón, proyectil, dianas, efectos, HUD.
-- Niveles y diseño: posiciones de dianas, niveles, obstáculos.
-- Extras y pulido: sonido, animaciones, menús, guardado de puntuaciones.
-
---- PROTOTIPO (PYGAME) ---
-"""
-
 import math
 import random
+import sys
 import pygame
+from typing import List, Tuple, Optional
 
-# ----- CONFIG -----
-WIDTH, HEIGHT = 900, 600
-FPS = 60
-GRAVITY = 9.81 * 100  # px/s^2
+# --- CONFIGURACIÓN Y CONSTANTES ---
 
-# Projectile settings
-PROJECTILE_RADIUS = 6
-PROJECTILE_COLOR = (200, 50, 50)
+class Config:
+    """Configuración general del juego"""
+    WIDTH: int = 900
+    HEIGHT: int = 600
+    FPS: int = 60
+    GRAVITY: float = 9.81 * 100  # px/s^2 ajustada a escala visual
+    TITLE: str = "Juego del Cañón - Prototipo Refactorizado"
 
-# Cannon settings
-CANNON_POS = (60, HEIGHT - 60)
-CANNON_LENGTH = 40
-CANNON_COLOR = (80, 80, 80)
+class Colors:
+    """Paleta de colores"""
+    BACKGROUND = (135, 206, 235)  # Sky Blue
+    GROUND = (85, 170, 60)        # Grass Green
+    TEXT = (10, 10, 10)
+    CANNON = (80, 80, 80)
+    PROJECTILE = (200, 50, 50)
+    PROJECTILE_TRAIL = (150, 150, 150)
+    TARGET = (50, 180, 50)
+    TARGET_CENTER = (255, 255, 255)
+    PREDICTION_LINE = (0, 0, 0)
+    MESSAGE_SUCCESS = (255, 40, 40)
 
-# Target settings
-TARGET_RADIUS = 20
-TARGET_COLOR = (50, 180, 50)
+class PhysicsParams:
+    """Parámetros físicos por defecto"""
+    PROJECTILE_RADIUS = 6
+    TARGET_RADIUS = 20
+    DRAG_COEFF = 0.02
+    CANNON_LENGTH = 40
+    CANNON_POS = (60, Config.HEIGHT - 60)
 
-# Physics toggles defaults
-ENABLE_WIND = False
-ENABLE_DRAG = False
-SHOW_TRAIL = True
-MOBILE_TARGET = True
+# --- UTILIDADES ---
 
-# Wind
-WIND_ACCEL = 0.0
+def clamp(value: float, min_val: float, max_val: float) -> float:
+    return max(min_val, min(max_val, value))
 
-# Drag coefficient
-DRAG_COEFF = 0.02
+# --- CLASES DEL JUEGO ---
 
-# Utility
-def clamp(x, a, b):
-    return max(a, min(b, x))
-
-# Classes
 class Projectile:
-    def __init__(self, pos, vel):
-        self.x, self.y = pos
-        self.vx, self.vy = vel
-        self.radius = PROJECTILE_RADIUS
+    def __init__(self, x: float, y: float, vx: float, vy: float):
+        self.x = x
+        self.y = y
+        self.vx = vx
+        self.vy = vy
+        self.radius = PhysicsParams.PROJECTILE_RADIUS
         self.alive = True
-        self.trail = []
+        self.trail: List[Tuple[int, int]] = []
 
-    def update(self, dt, wind_ax=0.0, drag=False):
-        ax = wind_ax
-        ay = GRAVITY
-        if drag:
-            ax -= DRAG_COEFF * self.vx
-            ay -= DRAG_COEFF * self.vy
+    def update(self, dt: float, wind_accel: float, drag_enabled: bool) -> None:
+        """Calcula la nueva posición basada en velocidad, gravedad, viento y rozamiento."""
+        ax = wind_accel
+        ay = Config.GRAVITY
+
+        if drag_enabled:
+            ax -= PhysicsParams.DRAG_COEFF * self.vx
+            ay -= PhysicsParams.DRAG_COEFF * self.vy
+
         self.vx += ax * dt
         self.vy += ay * dt
         self.x += self.vx * dt
         self.y += self.vy * dt
+
+        # Guardar estela
         self.trail.append((int(self.x), int(self.y)))
         if len(self.trail) > 300:
             self.trail.pop(0)
-        if self.y - self.radius > HEIGHT or self.x - self.radius > WIDTH or self.x + self.radius < 0:
+
+        # Verificar límites de pantalla
+        if (self.y - self.radius > Config.HEIGHT or 
+            self.x - self.radius > Config.WIDTH or 
+            self.x + self.radius < 0):
             self.alive = False
 
-    def draw(self, surf):
-        if SHOW_TRAIL and len(self.trail) > 1:
-            for i in range(0, len(self.trail)-1, 4):
-                pygame.draw.line(surf, (150,150,150), self.trail[i], self.trail[i+1], 2)
-        pygame.draw.circle(surf, PROJECTILE_COLOR, (int(self.x), int(self.y)), self.radius)
+    def draw(self, surface: pygame.Surface, show_trail: bool) -> None:
+        if show_trail and len(self.trail) > 1:
+            # Dibujar estela optimizada (saltando puntos para rendimiento)
+            if len(self.trail) >= 2:
+                pygame.draw.lines(surface, Colors.PROJECTILE_TRAIL, False, self.trail, 2)
+        
+        pygame.draw.circle(surface, Colors.PROJECTILE, (int(self.x), int(self.y)), self.radius)
+
 
 class Target:
-    def __init__(self, x, y, radius=TARGET_RADIUS, mobile=False):
+    def __init__(self, x: float, y: float, mobile: bool = False):
         self.base_x = x
         self.x = x
         self.y = y
-        self.radius = radius
+        self.radius = PhysicsParams.TARGET_RADIUS
         self.mobile = mobile
-        self.t = 0.0
-        self.amp = random.uniform(50, 150)
+        self.time_elapsed = 0.0
+        self.amplitude = random.uniform(50, 150)
         self.speed = random.uniform(0.6, 1.6)
 
-    def update(self, dt):
+    def update(self, dt: float) -> None:
         if self.mobile:
-            self.t += dt
-            self.x = self.base_x + math.sin(self.t * self.speed) * self.amp
+            self.time_elapsed += dt
+            self.x = self.base_x + math.sin(self.time_elapsed * self.speed) * self.amplitude
 
-    def draw(self, surf):
-        pygame.draw.circle(surf, TARGET_COLOR, (int(self.x), int(self.y)), self.radius)
-        pygame.draw.circle(surf, (255,255,255), (int(self.x), int(self.y)), int(self.radius*0.4))
+    def draw(self, surface: pygame.Surface) -> None:
+        pos = (int(self.x), int(self.y))
+        pygame.draw.circle(surface, Colors.TARGET, pos, self.radius)
+        pygame.draw.circle(surface, Colors.TARGET_CENTER, pos, int(self.radius * 0.4))
 
-    def check_hit(self, proj):
+    def check_collision(self, proj: Projectile) -> bool:
         dx = self.x - proj.x
         dy = self.y - proj.y
-        return dx*dx + dy*dy <= (self.radius + proj.radius)**2
+        dist_sq = dx*dx + dy*dy
+        return dist_sq <= (self.radius + proj.radius)**2
 
-# Main
 
-def main():
-    global ENABLE_WIND, WIND_ACCEL, ENABLE_DRAG, SHOW_TRAIL, MOBILE_TARGET
+class GameManager:
+    def __init__(self):
+        # Inicialización de Pygame segura
+        status = pygame.init()
+        if status[1] > 0:
+            print(f"Advertencia: {status[1]} módulos de Pygame fallaron al iniciar.")
 
-    pygame.init()
-    screen = pygame.display.set_mode((WIDTH, HEIGHT))
-    pygame.display.set_caption("Juego del Cañón - Prototipo")
-    clock = pygame.time.Clock()
-    font = pygame.font.SysFont(None, 24)
+        self.screen = pygame.display.set_mode((Config.WIDTH, Config.HEIGHT))
+        pygame.display.set_caption(Config.TITLE)
+        self.clock = pygame.time.Clock()
+        
+        # Fuentes
+        try:
+            self.font_ui = pygame.font.SysFont("Arial", 18)
+            self.font_msg = pygame.font.SysFont("Arial", 48, bold=True)
+        except Exception as e:
+            print(f"Error cargando fuentes: {e}, usando fuente por defecto.")
+            self.font_ui = pygame.font.Font(None, 24)
+            self.font_msg = pygame.font.Font(None, 48)
 
-    angle_deg = 35
-    power = 400.0
-    projectile = None
-    score = 0
-    message = ""
-    message_timer = 0.0
+        # Estado del juego
+        self.running = True
+        self.score = 0
+        self.angle = 35.0
+        self.power = 400.0
+        self.message = ""
+        self.message_timer = 0.0
+        
+        # Flags de física
+        self.enable_wind = False
+        self.enable_drag = False
+        self.show_trail = True
+        self.mobile_target_enabled = True
+        self.wind_accel = 0.0
 
-    target = Target(650, HEIGHT - 120, mobile=MOBILE_TARGET)
+        # Objetos
+        self.projectile: Optional[Projectile] = None
+        self.target = self._create_target()
 
-    running = True
-    while running:
-        dt = clock.tick(FPS) / 1000.0
+    def _create_target(self) -> Target:
+        """Crea un nuevo objetivo en una posición aleatoria segura."""
+        x_pos = random.randint(500, Config.WIDTH - 80)
+        return Target(x_pos, Config.HEIGHT - 120, mobile=self.mobile_target_enabled)
 
+    def handle_input(self, dt: float) -> None:
+        """Maneja eventos y estado del teclado."""
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                running = False
+                self.running = False
             elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_SPACE and projectile is None:
-                    rad = math.radians(angle_deg)
-                    vx = math.cos(rad) * power
-                    vy = -math.sin(rad) * power
-                    projectile = Projectile((CANNON_POS[0] + CANNON_LENGTH*math.cos(rad), CANNON_POS[1] - CANNON_LENGTH*math.sin(rad)), (vx, vy))
-                elif event.key == pygame.K_r:
-                    projectile = None
-                    target = Target(random.randint(500, WIDTH-80), HEIGHT - 120, mobile=MOBILE_TARGET)
-                    message = ""
-                elif event.key == pygame.K_m:
-                    MOBILE_TARGET = not MOBILE_TARGET
-                    target.mobile = MOBILE_TARGET
-                elif event.key == pygame.K_w:
-                    ENABLE_WIND = not ENABLE_WIND
-                    WIND_ACCEL = random.uniform(-200, 200) if ENABLE_WIND else 0.0
-                elif event.key == pygame.K_a:
-                    ENABLE_DRAG = not ENABLE_DRAG
-                elif event.key == pygame.K_t:
-                    SHOW_TRAIL = not SHOW_TRAIL
+                self._handle_keydown(event)
 
+        # Input continuo (mantener tecla)
         keys = pygame.key.get_pressed()
-        if keys[pygame.K_UP]: angle_deg = clamp(angle_deg + 60*dt, 0, 85)
-        if keys[pygame.K_DOWN]: angle_deg = clamp(angle_deg - 60*dt, 0, 85)
-        if keys[pygame.K_RIGHT]: power = clamp(power + 200*dt, 50, 1200)
-        if keys[pygame.K_LEFT]: power = clamp(power - 200*dt, 50, 1200)
+        if keys[pygame.K_UP]: 
+            self.angle = clamp(self.angle + 60 * dt, 0, 85)
+        if keys[pygame.K_DOWN]: 
+            self.angle = clamp(self.angle - 60 * dt, 0, 85)
+        if keys[pygame.K_RIGHT]: 
+            self.power = clamp(self.power + 200 * dt, 50, 1200)
+        if keys[pygame.K_LEFT]: 
+            self.power = clamp(self.power - 200 * dt, 50, 1200)
 
-        target.update(dt)
-        if projectile:
-            wind_ax = WIND_ACCEL if ENABLE_WIND else 0.0
-            projectile.update(dt, wind_ax, ENABLE_DRAG)
-            if target.check_hit(projectile):
-                message = "¡Has acertado!"
-                message_timer = 2.0
-                score += 1
-                projectile.alive = False
-            if not projectile.alive:
-                projectile = None
+    def _handle_keydown(self, event):
+        """Maneja pulsaciones individuales."""
+        if event.key == pygame.K_SPACE and self.projectile is None:
+            self._fire_projectile()
+        elif event.key == pygame.K_r:
+            self._reset_round()
+        elif event.key == pygame.K_m:
+            self.mobile_target_enabled = not self.mobile_target_enabled
+            self.target.mobile = self.mobile_target_enabled
+        elif event.key == pygame.K_w:
+            self.enable_wind = not self.enable_wind
+            self.wind_accel = random.uniform(-200, 200) if self.enable_wind else 0.0
+        elif event.key == pygame.K_a:
+            self.enable_drag = not self.enable_drag
+        elif event.key == pygame.K_t:
+            self.show_trail = not self.show_trail
+        elif event.key == pygame.K_ESCAPE:
+            self.running = False
 
-        if message_timer > 0:
-            message_timer -= dt
-            if message_timer <= 0: message = ""
+    def _fire_projectile(self):
+        rad = math.radians(self.angle)
+        # Posición inicial (punta del cañón)
+        cx, cy = PhysicsParams.CANNON_POS
+        length = PhysicsParams.CANNON_LENGTH
+        start_x = cx + length * math.cos(rad)
+        start_y = cy - length * math.sin(rad)
+        
+        # Velocidad inicial
+        vx = math.cos(rad) * self.power
+        vy = -math.sin(rad) * self.power
+        
+        self.projectile = Projectile(start_x, start_y, vx, vy)
 
-        screen.fill((135,206,235))
-        pygame.draw.rect(screen, (85,170,60), (0, HEIGHT-60, WIDTH, 60))
+    def _reset_round(self):
+        self.projectile = None
+        self.target = self._create_target()
+        self.message = ""
 
-        rad = math.radians(angle_deg)
-        barrel_end = (CANNON_POS[0] + CANNON_LENGTH * math.cos(rad), CANNON_POS[1] - CANNON_LENGTH * math.sin(rad))
-        pygame.draw.circle(screen, CANNON_COLOR, CANNON_POS, 22)
-        pygame.draw.line(screen, CANNON_COLOR, CANNON_POS, barrel_end, 8)
+    def update(self, dt: float) -> None:
+        """Actualiza la lógica del juego."""
+        self.target.update(dt)
 
-        target.draw(screen)
-        if projectile: projectile.draw(screen)
+        if self.projectile:
+            wind = self.wind_accel if self.enable_wind else 0.0
+            self.projectile.update(dt, wind, self.enable_drag)
+            
+            if self.target.check_collision(self.projectile):
+                self.message = "¡Has acertado!"
+                self.message_timer = 2.0
+                self.score += 1
+                self.projectile.alive = False
+            
+            if not self.projectile.alive:
+                self.projectile = None
 
-        # HUD y controles
-        controls = ["CONTROLES:", "M → Diana móvil ON/OFF", "W → Viento ON/OFF", "A → Rozamiento del aire ON/OFF", "T → Estela ON/OFF"]
-        for i, line in enumerate(controls):
-            surf = font.render(line, True, (10,10,10))
-            screen.blit(surf, (10, 60 + i*20))
+        if self.message_timer > 0:
+            self.message_timer -= dt
+            if self.message_timer <= 0:
+                self.message = ""
 
-        hud_lines = [f"Ángulo: {angle_deg:.1f}°  Potencia: {power:.0f} px/s  Puntuación: {score}",
-                     f"Viento: {'ON' if ENABLE_WIND else 'OFF'} ({WIND_ACCEL:.1f})  Rozamiento: {'ON' if ENABLE_DRAG else 'OFF'}  Diana móvil: {'ON' if MOBILE_TARGET else 'OFF'}"]
-        for i, line in enumerate(hud_lines):
-            surf = font.render(line, True, (10,10,10))
-            screen.blit(surf, (10, 10 + i*22))
-
-        if message:
-            big = pygame.font.SysFont(None, 48).render(message, True, (255,40,40))
-            screen.blit(big, (WIDTH//2 - big.get_width()//2, 40))
-
-        # Predictive dotted line
-        predict_points = []
-        sim_x = barrel_end[0]
-        sim_y = barrel_end[1]
-        sim_vx = math.cos(rad) * power
-        sim_vy = -math.sin(rad) * power
+    def _draw_prediction_line(self):
+        """Dibuja la trayectoria predicha."""
+        rad = math.radians(self.angle)
+        cx, cy = PhysicsParams.CANNON_POS
+        sim_x = cx + PhysicsParams.CANNON_LENGTH * math.cos(rad)
+        sim_y = cy - PhysicsParams.CANNON_LENGTH * math.sin(rad)
+        sim_vx = math.cos(rad) * self.power
+        sim_vy = -math.sin(rad) * self.power
+        
         sim_dt = 0.03
-        for _ in range(60):
-            if ENABLE_DRAG:
-                sim_vx += (-DRAG_COEFF*sim_vx)*sim_dt
-                sim_vy += (GRAVITY - DRAG_COEFF*sim_vy)*sim_dt
-            else:
-                sim_vx += (WIND_ACCEL if ENABLE_WIND else 0.0)*sim_dt
-                sim_vy += GRAVITY*sim_dt
-            sim_x += sim_vx*sim_dt
-            sim_y += sim_vy*sim_dt
-            if sim_y > HEIGHT-60: break
-            predict_points.append((int(sim_x), int(sim_y)))
-        if len(predict_points) > 1:
-            for i in range(0, len(predict_points)-1, 4):
-                pygame.draw.line(screen, (0,0,0), predict_points[i], predict_points[i+1], 1)
+        points = []
+        
+        # Simulación de física simplificada (Euler)
+        steps = 60 # Cantidad de puntos a predecir
+        wind = self.wind_accel if self.enable_wind else 0.0
+
+        for _ in range(steps):
+            ax = wind
+            ay = Config.GRAVITY
+            
+            if self.enable_drag:
+                ax -= PhysicsParams.DRAG_COEFF * sim_vx
+                ay -= PhysicsParams.DRAG_COEFF * sim_vy
+            
+            sim_vx += ax * sim_dt
+            sim_vy += ay * sim_dt
+            sim_x += sim_vx * sim_dt
+            sim_y += sim_vy * sim_dt
+            
+            if sim_y > Config.HEIGHT - 50: # Detener si toca el suelo
+                break
+            points.append((int(sim_x), int(sim_y)))
+
+        if len(points) > 1:
+            # Dibujar línea punteada manualmente (Pygame no tiene soporte nativo para dotted lines fácil)
+            for i in range(0, len(points) - 1, 4):
+                if i+1 < len(points):
+                    pygame.draw.line(self.screen, Colors.PREDICTION_LINE, points[i], points[i+1], 1)
+
+    def draw(self) -> None:
+        """Renderiza todos los elementos en pantalla."""
+        self.screen.fill(Colors.BACKGROUND)
+        
+        # Suelo
+        pygame.draw.rect(self.screen, Colors.GROUND, (0, Config.HEIGHT - 60, Config.WIDTH, 60))
+
+        # Cañón
+        rad = math.radians(self.angle)
+        cx, cy = PhysicsParams.CANNON_POS
+        end_x = cx + PhysicsParams.CANNON_LENGTH * math.cos(rad)
+        end_y = cy - PhysicsParams.CANNON_LENGTH * math.sin(rad)
+        
+        pygame.draw.circle(self.screen, Colors.CANNON, (cx, cy), 22)
+        pygame.draw.line(self.screen, Colors.CANNON, (cx, cy), (end_x, end_y), 8)
+
+        # Objetos
+        self._draw_prediction_line()
+        self.target.draw(self.screen)
+        
+        if self.projectile:
+            self.projectile.draw(self.screen, self.show_trail)
+
+        # UI / HUD
+        self._draw_ui()
 
         pygame.display.flip()
 
-    pygame.quit()
+    def _draw_ui(self):
+        # Texto de ayuda (Controles)
+        controls = [
+            "CONTROLES (ESC: Salir):", 
+            "M: Diana móvil", 
+            "W: Viento", 
+            "A: Rozamiento", 
+            "T: Estela"
+        ]
+        
+        for i, line in enumerate(controls):
+            surf = self.font_ui.render(line, True, Colors.TEXT)
+            self.screen.blit(surf, (10, 60 + i * 20))
+
+        # Texto de estado
+        status_text_1 = f"Ángulo: {self.angle:.1f}° | Potencia: {self.power:.0f} | Puntuación: {self.score}"
+        wind_status = f"Viento: {'ON' if self.enable_wind else 'OFF'} ({self.wind_accel:.1f})"
+        drag_status = f"Rozamiento: {'ON' if self.enable_drag else 'OFF'}"
+        mobile_status = f"Diana Móvil: {'ON' if self.mobile_target_enabled else 'OFF'}"
+        
+        status_text_2 = f"{wind_status} | {drag_status} | {mobile_status}"
+
+        surf1 = self.font_ui.render(status_text_1, True, Colors.TEXT)
+        surf2 = self.font_ui.render(status_text_2, True, Colors.TEXT)
+        
+        self.screen.blit(surf1, (10, 10))
+        self.screen.blit(surf2, (10, 32))
+
+        # Mensaje central
+        if self.message:
+            msg_surf = self.font_msg.render(self.message, True, Colors.MESSAGE_SUCCESS)
+            rect = msg_surf.get_rect(center=(Config.WIDTH // 2, 80))
+            self.screen.blit(msg_surf, rect)
+
+    def run(self):
+        """Bucle principal del juego."""
+        while self.running:
+            dt = self.clock.tick(Config.FPS) / 1000.0  # Delta time en segundos
+            self.handle_input(dt)
+            self.update(dt)
+            self.draw()
+        
+        pygame.quit()
+        sys.exit()
+
+# --- ENTRY POINT ---
 
 if __name__ == '__main__':
-    main()
+    try:
+        game = GameManager()
+        game.run()
+    except Exception as e:
+        print(f"Ocurrió un error fatal: {e}")
+        pygame.quit()
+        sys.exit(1)
+    except KeyboardInterrupt:
+        print("\nJuego cerrado por el usuario.")
+        pygame.quit()
+        sys.exit(0)
