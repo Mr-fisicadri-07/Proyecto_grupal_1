@@ -247,10 +247,14 @@ class GameManager:
                 self._handle_keydown(event)
 
         keys = pygame.key.get_pressed()
-        if keys[pygame.K_UP]: self.angle = clamp(self.angle + 60 * dt, 0, 90)
-        if keys[pygame.K_DOWN]: self.angle = clamp(self.angle - 60 * dt, 0, 90)
+        MIN_ANGLE = 40.0 
+        
         if keys[pygame.K_RIGHT]: self.power = clamp(self.power + 300 * dt, 50, 1500)
         if keys[pygame.K_LEFT]: self.power = clamp(self.power - 300 * dt, 50, 1500)
+        if keys[pygame.K_UP]: 
+            self.angle = clamp(self.angle + 60 * dt, MIN_ANGLE, 90)
+        if keys[pygame.K_DOWN]: 
+            self.angle = clamp(self.angle - 60 * dt, MIN_ANGLE, 90)
 
     def _handle_keydown(self, event):
         if event.key == pygame.K_SPACE and self.projectile is None:
@@ -262,20 +266,20 @@ class GameManager:
         elif event.key == pygame.K_m:
             self.mobile_target_enabled = not self.mobile_target_enabled
             self.target.mobile = self.mobile_target_enabled
-        elif event.key == pygame.K_LEFTBRACKET: # [ Disminuir tamaño
+        elif event.key == pygame.K_q: # q Disminuir tamaño
             self.target.change_size(-5)
-        elif event.key == pygame.K_RIGHTBRACKET: # ] Aumentar tamaño
+        elif event.key == pygame.K_e: # e Aumentar tamaño
             self.target.change_size(5)
-        elif event.key == pygame.K_MINUS: # - Menos velocidad
+        elif event.key == pygame.K_MINUS or event.unicode == '-': 
             self.target.change_speed(-0.2)
-        elif event.key == pygame.K_PLUS or event.key == pygame.K_EQUALS: # + Más velocidad
+        elif event.key == pygame.K_PLUS or event.key == pygame.K_EQUALS or event.unicode == '+': 
             self.target.change_speed(0.2)
 
         # Modificadores de entorno
         elif event.key == pygame.K_w:
             self.enable_wind = not self.enable_wind
             self.wind_accel = random.uniform(-300, 300) if self.enable_wind else 0.0
-        elif event.key == pygame.K_a:
+        elif event.key == pygame.K_d:
             self.enable_drag = not self.enable_drag
         elif event.key == pygame.K_t:
             self.show_trail = not self.show_trail
@@ -412,7 +416,7 @@ class GameManager:
             f"Viento: {self.wind_accel:.0f} | Drag: {'SI' if self.enable_drag else 'NO'}",
             f"Diana Vel: x{self.target.speed_multiplier:.1f} | Radio: {self.target.radius}",
             "---------------------------",
-            "[ / ] : Tamaño Diana",
+            "q / e : Tamaño Diana",
             "- / + : Velocidad Diana",
             "M: Movimiento | W: Viento"
         ]
