@@ -98,14 +98,14 @@ class GameLogic:
             print(f"Error leyendo JSON: {e}")
             return datos_default
 
-    #def save_record(self) -> bool:
-    #    if self.score > self.high_score:
-    #        self.high_score = self.score
-    #        try:
-    #            with open(Config.FILE_RECORD, "w") as f: f.write(str(self.high_score))
-    #            return True
-    #        except: pass
-    #    return False
+    def save_record(self) -> bool:
+        if self.score > self.high_score:
+            self.high_score = self.score
+            try:
+                with open(Config.FILE_RECORD, "w") as f: f.write(str(self.high_score))
+                return True
+            except: pass
+        return False
 
     def generate_turn(self) -> Tuple[str, bool]:
         # Usamos los datos cargados del JSON
