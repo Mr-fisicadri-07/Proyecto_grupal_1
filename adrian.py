@@ -89,18 +89,18 @@ class GameLogic:
                 return int(content) if content.isdigit() else 0
         except IOError:
             return 0
-
-    def save_record(self) -> bool:
-        """Guarda el récord. Retorna True si hubo un nuevo récord."""
-        if self.score > self.high_score:
-            self.high_score = self.score
-            try:
-                with open(Config.FILE_RECORD, "w") as f:
-                    f.write(str(self.high_score))
-                return True
-            except IOError:
-                print("Advertencia: No se pudo guardar el récord en disco.")
-        return False
+    
+    #def save_record(self) -> bool:
+    #    """Guarda el récord. Retorna True si hubo un nuevo récord."""
+    #    if self.score > self.high_score:
+    #        self.high_score = self.score
+    #        try:
+    #            with open(Config.FILE_RECORD, "w") as f:
+    #                f.write(str(self.high_score))
+    #            return True
+    #        except IOError:
+    #            print("Advertencia: No se pudo guardar el récord en disco.")
+    #    return False
 
     def generate_turn(self) -> Tuple[str, bool]:
         """Genera un nuevo desafío aleatorio. Retorna (texto_a_mostrar, simon_lo_dijo)."""
