@@ -5,6 +5,7 @@ import os
 import threading
 import sys
 from typing import Optional, Tuple
+import json
 
 # =========================================================
 # CONFIGURACIÓN
@@ -67,6 +68,9 @@ class GameLogic:
         self.current_answer = ""
         self.simon_says = False
         
+        # Cargar datos del JSON
+        self.datos = self._cargar_datos_json()
+
     def _load_record(self) -> int:
         if not os.path.exists(Config.FILE_RECORD): return 0
         try:
@@ -74,6 +78,25 @@ class GameLogic:
                 c = f.read().strip()
                 return int(c) if c.isdigit() else 0
         except: return 0
+
+    def _cargar_datos_json(self):
+        """Carga las preguntas y respuestas desde el archivo JSON."""
+        archivo = "datos_juego.json"
+        datos_default = {
+            "palabras": ["python", "demo"],
+            "capitales": [{"pais": "España", "respuesta": "madrid"}]
+        }
+        
+        if not os.path.exists(archivo):
+            print(f"Alerta: No se encontró {archivo}, usando datos por defecto.")
+            return datos_default
+            
+        try:
+            with open(archivo, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"Error leyendo JSON: {e}")
+            return datos_default
 
     #def save_record(self) -> bool:
     #    if self.score > self.high_score:
@@ -85,33 +108,40 @@ class GameLogic:
     #    return False
 
     def generate_turn(self) -> Tuple[str, bool]:
-        capitals = {
-            "Francia": "paris", "España": "madrid", "Italia": "roma", 
-            "Alemania": "berlin", "Portugal": "lisboa", "Reino Unido": "londres",
-            "Japón": "tokio", "Rusia": "moscu"
-        }
-        words = ["python", "codigo", "simon", "juego", "ventana", "teclado", "raton"]
+        # Usamos los datos cargados del JSON
+        palabras = self.datos.get("palabras", ["error"])
+        capitales_lista = self.datos.get("capitales", [])
         
         tipo = random.choice(['math', 'word', 'capital'])
         text_base = ""
 
         if tipo == 'math':
+            # Las matemáticas siguen siendo generadas por código porque son infinitas
             a, b = random.randint(1, 20), random.randint(1, 20)
             text_base = f"calcula {a} + {b}"
             self.current_answer = str(a + b)
+            
         elif tipo == 'word':
-            word = random.choice(words)
+            word = random.choice(palabras)
             text_base = f"escribe '{word}'"
             self.current_answer = word
+            
         elif tipo == 'capital':
-            pais, cap = random.choice(list(capitals.items()))
-            text_base = f"¿capital de {pais}?"
-            self.current_answer = cap
+            if capitales_lista:
+                item = random.choice(capitales_lista)
+                pais = item["pais"]
+                self.current_answer = item["respuesta"]
+                text_base = f"¿capital de {pais}?"
+            else:
+                # Fallback por si el JSON de capitales está vacío
+                text_base = "escribe 'error'"
+                self.current_answer = "error"
 
         self.simon_says = random.choice([True, False])
         display = f"Simón dice: {text_base}" if self.simon_says else text_base.capitalize()
         return display, self.simon_says
 
+    # ... (Los métodos check_answer y check_pass siguen igual) ...
     def check_answer(self, user_input: str) -> Tuple[bool, str]:
         user_input = user_input.lower().strip()
         if self.simon_says:
@@ -170,7 +200,7 @@ class SimonDiceApp:
             "   Debes obedecer (calcular, escribir, etc.) y pulsar '¡Hacerlo!'.\n\n"
             "2. Si la orden NO empieza por 'Simón dice':\n"
             "   ¡NO HAGAS NADA! Debes pulsar el botón 'Pasar / Ignorar'.\n\n"
-            "3. Tienes 15 segundos por turno.\n"
+            "3. Tienes 15 segundos por turno.\n\n"
             "4. Si fallas o se acaba el tiempo, pierdes."
         )
 
