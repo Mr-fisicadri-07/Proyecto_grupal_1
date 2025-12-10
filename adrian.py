@@ -143,16 +143,23 @@ class GameLogic:
         display = f"Simón dice: {text_base}" if self.simon_says else text_base.capitalize()
         return display, self.simon_says
 
-    # ... (Los métodos check_answer y check_pass siguen igual) ...
     def check_answer(self, user_input: str) -> Tuple[bool, str]:
         user_input = user_input.lower().strip()
         if self.simon_says:
-            return (True, "") if user_input == self.current_answer else (False, f"Era '{self.current_answer}'")
+            if user_input == self.current_answer:
+                self.score += 1
+                return (True, "")
+            else:
+                return (False, f"Era '{self.current_answer}'")
         else:
             return (False, "¡Simón no dijo nada!")
 
     def check_pass(self) -> Tuple[bool, str]:
-        return (False, "¡Simón ordenó hacerlo!") if self.simon_says else (True, "")
+        if self.simon_says:
+            return (False, "¡Simón ordenó hacerlo!")
+        else:
+            self.score += 1
+            return (True, "")
 
 # =========================================================
 # APP PRINCIPAL (VISTA + CONTROLADOR)
