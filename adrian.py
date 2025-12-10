@@ -20,8 +20,8 @@ class SimonDiceApp:
         self.root.configure(bg="#f0f0f0")
 
         # --- CONFIGURACIÓN DE PERSISTENCIA ---
-        self.archivo_record = "simon_record.txt"
-        self.record_maximo = self.cargar_record()
+        # self.archivo_record = "simon_record.txt"
+        # self.record_maximo = self.cargar_record()
 
         # --- PROTOCOLO DE CIERRE ---
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
