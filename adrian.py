@@ -11,7 +11,7 @@ import json
 # CONFIGURACIÓN
 # =========================================================
 class Config:
-    TITLE = "Simón Dice - Edición Profesional"
+    TITLE = "Simón Dice"
     GEOMETRY = "600x650"  # Un poco más alto para las reglas
     BG_COLOR = "#f0f0f0"
     
@@ -30,6 +30,7 @@ class Config:
     FONT_HEADER = ("Helvetica", 16, "bold")
     
     FILE_RECORD = "simon_record.txt"
+    #podríamos meter niveles
     TIME_LIMIT = 15
     SOUND_ENABLED = sys.platform == "win32"
 
@@ -53,7 +54,7 @@ class SoundManager:
 
     def _generate_tone(self, sound_type: str) -> None:
         try:
-            if sound_type == "success": self.winsound.Beep(1000, 150)
+            if sound_type == "success": self.winsound.Beep(1000, 150) #ya modificaremos estas cosas
             elif sound_type == "error": self.winsound.Beep(150, 600)
             elif sound_type == "start": self.winsound.Beep(600, 300)
         except: pass
@@ -82,6 +83,7 @@ class GameLogic:
     def _cargar_datos_json(self):
         """Carga las preguntas y respuestas desde el archivo JSON."""
         archivo = "datos_juego.json"
+        # Datos por defecto en caso de error
         datos_default = {
             "palabras": ["python", "demo"],
             "capitales": [{"pais": "España", "respuesta": "madrid"}]
@@ -98,14 +100,14 @@ class GameLogic:
             print(f"Error leyendo JSON: {e}")
             return datos_default
 
-    #def save_record(self) -> bool:
-    #    if self.score > self.high_score:
-    #        self.high_score = self.score
-    #        try:
-    #            with open(Config.FILE_RECORD, "w") as f: f.write(str(self.high_score))
-    #            return True
-    #        except: pass
-    #    return False
+    def save_record(self) -> bool:
+        if self.score > self.high_score:
+            self.high_score = self.score
+            try:
+                with open(Config.FILE_RECORD, "w") as f: f.write(str(self.high_score))
+                return True
+            except: pass
+        return False
 
     def generate_turn(self) -> Tuple[str, bool]:
         # Usamos los datos cargados del JSON
@@ -277,10 +279,6 @@ class SimonDiceApp:
         self.btn_retry = tk.Button(self.frame_gameover, text="Intentar de nuevo", command=self.start_game_session,
                                    bg=Config.COLOR_ACCENT, fg="white", font=Config.FONT_BOLD)
         self.btn_retry.pack(side=tk.LEFT, padx=10)
-        
-        self.btn_back_menu = tk.Button(self.frame_gameover, text="Volver al Menú", command=self.show_menu,
-                                       bg="#607D8B", fg="white", font=Config.FONT_BOLD)
-        self.btn_back_menu.pack(side=tk.LEFT, padx=10)
 
     # --- Lógica de Turnos ---
     def start_new_turn(self):
