@@ -18,7 +18,7 @@ except ImportError:
 # CONFIGURACIÓN
 # =========================================================
 class Config:
-    TITLE = "Simón Dice: Edición Memes"
+    TITLE = "Simón Dice"
     GEOMETRY = "600x700"
     BG_COLOR = "#f0f0f0"
     
