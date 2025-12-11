@@ -42,54 +42,85 @@ class Config:
 # =========================================================
 # GESTOR DE SONIDO AVANZADO
 # =========================================================
+# =========================================================
+# GESTOR DE SONIDO (VERSIÓN COMPATIBLE SIN FFMPEG)
+# =========================================================
 class SoundManager:
     def __init__(self):
         self.enabled = _PYGAME_AVAILABLE
         self.sounds = {}
-        self.current_bg = None # Para controlar la música de fondo
+        self.current_bg = None 
         
         if self.enabled:
             try:
                 mixer.init()
-                # Cargar todos los sonidos en memoria
-                for key, filename in Config.SOUNDS.items():
-                    if os.path.exists(filename):
-                        # Usamos Sound para todo para tener mejor control de canales
-                        self.sounds[key] = mixer.Sound(filename)
-                        # Ajustar volúmenes
-                        if "bg" in key: self.sounds[key].set_volume(0.3)
-                        if "hurry" in key: self.sounds[key].set_volume(0.5)
-                        if "win" in key: self.sounds[key].set_volume(0.4)
-                    else:
-                        print(f"⚠️ Falta audio: {filename}")
+                
+                # Nombres base de los archivos que buscamos
+                nombres_audios = [
+                    "bg_normal", "bg_eater", "hurry", "fail", 
+                    "gameover", "win", "special_peru", 
+                    "special_espana", "epic_50", "easter_egg"
+                ]
+                
+                # Mapeo de nombres internos a nombres de archivo en disco
+                # (El diccionario de Config.SOUNDS ya no es estricto con la extensión)
+                mapa_archivos = {
+                    "bg_normal": "tiempo",
+                    "bg_eater": "tiempo_eater",
+                    "hurry": "poco_tiempo",
+                    "fail": "fallo",
+                    "gameover": "derrota",
+                    "win": "victoria",
+                    "special_peru": "peru",
+                    "special_espana": "espana",
+                    "epic_50": "record_50",
+                    "easter_egg": "onichan"
+                }
+
+                # Extensiones posibles que vamos a probar
+                extensiones = [".mp3", ".m4a", ".webm", ".wav", ".ogg"]
+
+                for key, nombre_archivo in mapa_archivos.items():
+                    cargado = False
+                    # Buscamos el archivo probando todas las extensiones
+                    for ext in extensiones:
+                        ruta = f"{nombre_archivo}{ext}"
+                        if os.path.exists(ruta):
+                            try:
+                                self.sounds[key] = mixer.Sound(ruta)
+                                cargado = True
+                                # Ajustes de volumen
+                                if "bg" in key: self.sounds[key].set_volume(0.3)
+                                if "hurry" in key: self.sounds[key].set_volume(0.5)
+                                if "win" in key: self.sounds[key].set_volume(0.4)
+                                break # Ya lo encontramos, dejamos de buscar extensiones
+                            except Exception as e:
+                                print(f"Error cargando {ruta}: {e}")
+
+                    if not cargado:
+                        print(f"⚠️ AVISO: No se encontró audio para '{key}' (busqué {nombre_archivo}.*)")
+
             except Exception as e:
-                print(f"Error Pygame: {e}")
+                print(f"Error general Pygame: {e}")
                 self.enabled = False
 
     def play_effect(self, sound_key):
-        """Reproduce un efecto de sonido corto (encima de la música)."""
         if self.enabled and sound_key in self.sounds:
             self.sounds[sound_key].play()
 
     def play_background(self, sound_key):
-        """Reproduce música de fondo (detiene la anterior)."""
         if not self.enabled: return
-        
-        self.stop_background() # Parar lo que sonaba antes
-        
+        self.stop_background()
         if sound_key in self.sounds:
             self.current_bg = self.sounds[sound_key]
-            # loops=-1 hace que se repita infinitamente
             self.current_bg.play(loops=-1)
 
     def stop_background(self):
-        """Detiene solo la música de fondo."""
         if self.current_bg:
             self.current_bg.stop()
             self.current_bg = None
 
     def stop_all(self):
-        """Detiene todo el audio."""
         if self.enabled:
             mixer.stop()
 
