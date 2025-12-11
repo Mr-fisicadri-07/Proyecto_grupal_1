@@ -2,8 +2,6 @@ import tkinter as tk
 from tkinter import messagebox
 import random
 import os
-import threading
-import sys
 import json
 from typing import Tuple
 
@@ -14,37 +12,16 @@ try:
 except ImportError:
     _PYGAME_AVAILABLE = False
 
-# =========================================================
 # CONFIGURACIÓN
-# =========================================================
 class Config:
     TITLE = "Simón Dice"
     GEOMETRY = "600x700"
     BG_COLOR = "#f0f0f0"
-    
     FILE_RECORD = "simon_record.txt"
-    TIME_LIMIT = 15 # Segundos por turno
-    
-    # Nombres de archivos de audio (deben estar en la misma carpeta)
-    SOUNDS = {
-        "bg_normal": "tiempo.mp3",       # Música de fondo 1
-        "bg_eater": "tiempo_eater.mp3",  # Música de fondo 2
-        "hurry": "poco_tiempo.mp3",      # Quedan 5 segundos
-        "fail": "fallo.mp3",             # Error inmediato
-        "gameover": "derrota.mp3",       # Pantalla de derrota
-        "win": "victoria.mp3",           # Acierto
-        "special_peru": "peru.mp3",      # Pregunta de Perú
-        "special_espana": "espana.mp3",  # Pregunta de España
-        "epic_50": "record_50.mp3",      # Llegar a 50 puntos
-        "easter_egg": "onichan.mp3"      # Evento raro
-    }
+    FILE_SOUNDS_CONFIG = "sounds.json"
+    TIME_LIMIT = 15
 
-# =========================================================
-# GESTOR DE SONIDO AVANZADO
-# =========================================================
-# =========================================================
-# GESTOR DE SONIDO (VERSIÓN COMPATIBLE SIN FFMPEG)
-# =========================================================
+# GESTOR DE SONIDO (SIMPLIFICADO)
 class SoundManager:
     def __init__(self):
         self.enabled = _PYGAME_AVAILABLE
@@ -52,57 +29,23 @@ class SoundManager:
         self.current_bg = None 
         
         if self.enabled:
-            try:
-                mixer.init()
-                
-                # Nombres base de los archivos que buscamos
-                nombres_audios = [
-                    "bg_normal", "bg_eater", "hurry", "fail", 
-                    "gameover", "win", "special_peru", 
-                    "special_espana", "epic_50", "easter_egg"
-                ]
-                
-                # Mapeo de nombres internos a nombres de archivo en disco
-                # (El diccionario de Config.SOUNDS ya no es estricto con la extensión)
-                mapa_archivos = {
-                    "bg_normal": "tiempo",
-                    "bg_eater": "tiempo_eater",
-                    "hurry": "poco_tiempo",
-                    "fail": "fallo",
-                    "gameover": "derrota",
-                    "win": "victoria",
-                    "special_peru": "peru",
-                    "special_espana": "espana",
-                    "epic_50": "record_50",
-                    "easter_egg": "onichan"
-                }
+            mixer.init()
+            self._load_sounds()
 
-                # Extensiones posibles que vamos a probar
-                extensiones = [".mp3", ".m4a", ".webm", ".wav", ".ogg"]
+    def _load_sounds(self):
+        # Carga directa del JSON sin comprobaciones de seguridad
+        with open(Config.FILE_SOUNDS_CONFIG, 'r') as f:
+            mapa_archivos = json.load(f)
 
-                for key, nombre_archivo in mapa_archivos.items():
-                    cargado = False
-                    # Buscamos el archivo probando todas las extensiones
-                    for ext in extensiones:
-                        ruta = f"{nombre_archivo}{ext}"
-                        if os.path.exists(ruta):
-                            try:
-                                self.sounds[key] = mixer.Sound(ruta)
-                                cargado = True
-                                # Ajustes de volumen
-                                if "bg" in key: self.sounds[key].set_volume(0.3)
-                                if "hurry" in key: self.sounds[key].set_volume(0.5)
-                                if "win" in key: self.sounds[key].set_volume(0.4)
-                                break # Ya lo encontramos, dejamos de buscar extensiones
-                            except Exception as e:
-                                print(f"Error cargando {ruta}: {e}")
-
-                    if not cargado:
-                        print(f"⚠️ AVISO: No se encontró audio para '{key}' (busqué {nombre_archivo}.*)")
-
-            except Exception as e:
-                print(f"Error general Pygame: {e}")
-                self.enabled = False
+        for key, nombre_archivo in mapa_archivos.items():
+            # Asumimos directamente que es .mp3
+            ruta = f"{nombre_archivo}.mp3"
+            self.sounds[key] = mixer.Sound(ruta)
+            
+            # Ajustes rápidos de volumen
+            if "bg" in key: self.sounds[key].set_volume(0.3)
+            if "hurry" in key: self.sounds[key].set_volume(0.5)
+            if "win" in key: self.sounds[key].set_volume(0.4)
 
     def play_effect(self, sound_key):
         if self.enabled and sound_key in self.sounds:
@@ -124,18 +67,15 @@ class SoundManager:
         if self.enabled:
             mixer.stop()
 
-# =========================================================
 # LÓGICA DEL JUEGO
-# =========================================================
 class GameLogic:
     def __init__(self):
         self.score = 0
         self.high_score = self._load_record()
         self.current_answer = ""
         self.simon_says = False
-        self.last_country = "" # Para detectar Perú/España
+        self.last_country = ""
         
-        # Datos ampliados para probar los audios
         self.datos = {
             "palabras": ["python", "código", "java", "meme", "anime", "gato"],
             "capitales": [
@@ -162,28 +102,24 @@ class GameLogic:
         return False
 
     def generate_turn(self) -> Tuple[str, bool]:
-        self.last_country = "" # Reset
+        self.last_country = ""
         tipo = random.choice(['math', 'word', 'capital'])
-        
-        # Ajustamos probabilidad para que salgan más países y probar audios
         if random.random() < 0.4: tipo = 'capital' 
 
         if tipo == 'math':
             a, b = random.randint(1, 20), random.randint(1, 20)
             text_base = f"calcula {a} + {b}"
             self.current_answer = str(a + b)
-            
         elif tipo == 'word':
             word = random.choice(self.datos["palabras"])
             text_base = f"escribe '{word}'"
             self.current_answer = word
-            
         elif tipo == 'capital':
             item = random.choice(self.datos["capitales"])
             pais = item["pais"]
             self.current_answer = item["respuesta"]
             text_base = f"¿capital de {pais}?"
-            self.last_country = pais # Guardamos para el audio
+            self.last_country = pais
 
         self.simon_says = random.choice([True, False])
         display = f"Simón dice: {text_base}" if self.simon_says else text_base.capitalize()
@@ -203,9 +139,7 @@ class GameLogic:
         self.score += 1
         return (True, "")
 
-# =========================================================
 # APP PRINCIPAL
-# =========================================================
 class SimonDiceApp:
     def __init__(self, root: tk.Tk):
         self.root = root
@@ -221,11 +155,10 @@ class SimonDiceApp:
 
     def clear_window(self):
         self.stop_timer()
-        self.sound.stop_all() # Parar sonidos al cambiar pantalla
+        self.sound.stop_all()
         for widget in self.root.winfo_children():
             widget.destroy()
 
-    # --- MENÚ ---
     def show_menu(self):
         self.clear_window()
         frame = tk.Frame(self.root, bg=Config.BG_COLOR)
@@ -234,14 +167,9 @@ class SimonDiceApp:
         tk.Label(frame, text="🤡 SIMÓN DICE 🤡", font=("Helvetica", 28, "bold"), 
                  bg=Config.BG_COLOR, fg="#FF5722").pack(pady=20)
         
-        tk.Label(frame, text="Edición Audios Latinos/Memes", font=("Helvetica", 12), 
-                 bg=Config.BG_COLOR).pack()
+        tk.Button(frame, text="JUGAR AHORA", command=self.start_game_session,
+                        bg="#4CAF50", fg="white", font=("Helvetica", 16, "bold"), height=2).pack(pady=50, fill="x")
 
-        btn = tk.Button(frame, text="JUGAR AHORA", command=self.start_game_session,
-                        bg="#4CAF50", fg="white", font=("Helvetica", 16, "bold"), height=2)
-        btn.pack(pady=50, fill="x")
-
-    # --- JUEGO ---
     def start_game_session(self):
         self.clear_window()
         self.logic = GameLogic()
@@ -250,7 +178,6 @@ class SimonDiceApp:
         self.start_new_turn()
 
     def _build_game_ui(self):
-        # UI similar a la anterior
         frame_top = tk.Frame(self.root, bg=Config.BG_COLOR)
         frame_top.pack(fill="x", pady=10)
         
@@ -280,7 +207,6 @@ class SimonDiceApp:
         if not self.root.winfo_exists(): return
         self.is_playing = True
         
-        # 1. Generar Lógica
         text, _ = self.logic.generate_turn()
         self.lbl_instruction.config(text=text, fg="black")
         
@@ -288,40 +214,31 @@ class SimonDiceApp:
         self.entry.config(state='normal')
         self.entry.focus()
 
-        # 2. SISTEMA DE AUDIO INTELIGENTE
-        # Paramos la música anterior
         self.sound.stop_background()
         
-        # Chequeos especiales según el texto generado
         if self.logic.last_country == "España":
             self.sound.play_background("special_espana")
         elif self.logic.last_country == "Perú":
             self.sound.play_background("special_peru")
         else:
-            # Easter egg: 5% probabilidad de Onichan
             if random.random() < 0.05:
                 self.sound.play_effect("easter_egg")
-                # Ponemos música suave de fondo tras el onichan
                 self.root.after(1500, lambda: self.sound.play_background("bg_normal"))
             else:
-                # Música normal aleatoria (50% probabilidad)
                 bg = "bg_normal" if random.random() > 0.5 else "bg_eater"
                 self.sound.play_background(bg)
 
-        # Iniciar Timer
         self.timer_left = Config.TIME_LIMIT
         self.stop_timer()
         self._update_timer()
 
     def _update_timer(self):
         if not self.is_playing: return
-        
         self.lbl_timer.config(text=f"⏱ {self.timer_left}s")
         
-        # EVENTO: Queda poco tiempo (Majora's Mask)
         if self.timer_left == 5:
-            self.sound.stop_background() # Paramos la música tranquila
-            self.sound.play_effect("hurry") # Pánico
+            self.sound.stop_background()
+            self.sound.play_effect("hurry")
 
         if self.timer_left <= 0:
             self.handle_game_over("¡SE ACABÓ EL TIEMPO!")
@@ -334,7 +251,6 @@ class SimonDiceApp:
             self.root.after_cancel(self.timer_id)
             self.timer_id = None
 
-    # --- ACCIONES ---
     def action_submit(self):
         if not self.is_playing: return
         self.stop_timer()
@@ -348,27 +264,23 @@ class SimonDiceApp:
         self._process_result(success, msg)
 
     def _process_result(self, success, fail_msg):
-        self.sound.stop_background() # Parar música de fondo (especialmente la de "hurry")
-        
+        self.sound.stop_background()
         if success:
-            # EVENTO: 50 Puntos
             if self.logic.score == 50:
                 self.sound.play_effect("epic_50")
-                messagebox.showinfo("¡WOW!", "¡50 PUNTOS! ¡ERES UN DIOS!")
+                messagebox.showinfo("¡WOW!", "¡50 PUNTOS!")
             else:
                 self.sound.play_effect("win")
             
             self.lbl_score.config(text=f"Pts: {self.logic.score}")
-            self.root.after(1500, self.start_new_turn) # Esperar un poco para oír el audio
+            self.root.after(1500, self.start_new_turn)
         else:
-            self.sound.play_effect("fail") # Bocina
+            self.sound.play_effect("fail")
             self.handle_game_over(fail_msg)
 
     def handle_game_over(self, reason):
         self.is_playing = False
         new_record = self.logic.save_record()
-        
-        # Esperar 1 segundo tras el fallo para poner la música triste
         self.root.after(1000, lambda: self.sound.play_background("gameover"))
 
         self.lbl_instruction.config(text=f"💀 FIN 💀\n{reason}", fg="red")
@@ -376,20 +288,17 @@ class SimonDiceApp:
         
         msg = f"Récord Nuevo: {self.logic.high_score}" if new_record else f"Puntos: {self.logic.score}"
         
-        # Usamos un frame sobrepuesto en lugar de messagebox para no bloquear el audio
         frame_over = tk.Frame(self.root, bg="#333", relief="raised", bd=5)
         frame_over.place(relx=0.5, rely=0.5, anchor="center", width=400, height=200)
         
         tk.Label(frame_over, text="¡PERDISTE!", fg="red", bg="#333", font=("Arial", 20, "bold")).pack(pady=10)
         tk.Label(frame_over, text=msg, fg="white", bg="#333", font=("Arial", 14)).pack(pady=10)
-        
         tk.Button(frame_over, text="Reintentar", command=self.start_game_session, bg="white").pack(pady=5)
         tk.Button(frame_over, text="Salir", command=self.root.destroy, bg="red", fg="white").pack(pady=5)
 
 if __name__ == "__main__":
     if not _PYGAME_AVAILABLE:
-        print("ADVERTENCIA: Instala pygame (pip install pygame) para oír los audios.")
-    
+        print("Instala pygame: pip install pygame")
     root = tk.Tk()
     app = SimonDiceApp(root)
     root.mainloop()

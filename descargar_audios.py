@@ -1,5 +1,4 @@
 import yt_dlp
-import os
 
 # Diccionario: Nombre del archivo que necesita el juego -> URL de YouTube
 audios = {
