@@ -1,241 +1,364 @@
 import tkinter as tk
 from tkinter import messagebox
-import chess
-import chess.engine
 import random
 import os
+import threading
+import sys
+import json
+from typing import Tuple
 
-class AjedrezApp:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("Ajedrez Python + Stockfish Configurable")
-        self.root.geometry("900x700")
-        
-        # --- RUTA DEL MOTOR ---
-        # Si usas ruta completa, ponla aquí con r"" 
-        # Ejemplo: r"C:\Users\TuUsuario\Downloads\stockfish.exe"
-        self.ruta_stockfish = "stockfish.exe" 
-        
-        self.color_claro = "#F0D9B5"
-        self.color_oscuro = "#B58863"
-        self.color_resaltado = "#6A9955"
-        self.pieces = {
-            'r': '♜', 'n': '♞', 'b': '♝', 'q': '♛', 'k': '♚', 'p': '♟',
-            'R': '♖', 'N': '♘', 'B': '♗', 'Q': '♕', 'K': '♔', 'P': '♙'
-        }
-        
-        self.modo_juego = None 
-        self.buttons = {}
-        self.selected_square = None
-        self.nivel_dificultad = 10 # Valor por defecto
-        
-        self.mostrar_menu()
+# Intentamos importar pygame
+try:
+    from pygame import mixer
+    _PYGAME_AVAILABLE = True
+except ImportError:
+    _PYGAME_AVAILABLE = False
 
-    def mostrar_menu(self):
-        for widget in self.root.winfo_children(): widget.destroy()
-        
-        menu_frame = tk.Frame(self.root)
-        menu_frame.pack(expand=True)
-        
-        tk.Label(menu_frame, text="♞ Ajedrez Pro ♜", font=("Helvetica", 30, "bold")).pack(pady=20)
-        
-        # --- VERIFICACIÓN DE ENGINE ---
-        estado_sf = " (No detectado)"
-        color_sf = "red"
-        estado_btn = "disabled" # Deshabilitar si no hay engine
-        
-        if os.path.exists(self.ruta_stockfish):
-            estado_sf = " (Activado)"
-            color_sf = "green"
-            estado_btn = "normal"
-        
-        # --- BOTONES ---
-        btn_pvp = tk.Button(menu_frame, text="Jugador vs Jugador", font=("Arial", 16), 
-                            width=25, command=lambda: self.iniciar_juego("PVP"))
-        btn_pvp.pack(pady=5)
-        
-        # Espaciador
-        tk.Label(menu_frame, text="").pack()
+# =========================================================
+# CONFIGURACIÓN
+# =========================================================
+class Config:
+    TITLE = "Simón Dice: Edición Memes"
+    GEOMETRY = "600x700"
+    BG_COLOR = "#f0f0f0"
+    
+    FILE_RECORD = "simon_record.txt"
+    TIME_LIMIT = 15 # Segundos por turno
+    
+    # Nombres de archivos de audio (deben estar en la misma carpeta)
+    SOUNDS = {
+        "bg_normal": "tiempo.mp3",       # Música de fondo 1
+        "bg_eater": "tiempo_eater.mp3",  # Música de fondo 2
+        "hurry": "poco_tiempo.mp3",      # Quedan 5 segundos
+        "fail": "fallo.mp3",             # Error inmediato
+        "gameover": "derrota.mp3",       # Pantalla de derrota
+        "win": "victoria.mp3",           # Acierto
+        "special_peru": "peru.mp3",      # Pregunta de Perú
+        "special_espana": "espana.mp3",  # Pregunta de España
+        "epic_50": "record_50.mp3",      # Llegar a 50 puntos
+        "easter_egg": "onichan.mp3"      # Evento raro
+    }
 
-        # --- CONTROL DE DIFICULTAD ---
-        tk.Label(menu_frame, text="Nivel de la IA (0 - 20)", font=("Arial", 12)).pack()
+# =========================================================
+# GESTOR DE SONIDO AVANZADO
+# =========================================================
+class SoundManager:
+    def __init__(self):
+        self.enabled = _PYGAME_AVAILABLE
+        self.sounds = {}
+        self.current_bg = None # Para controlar la música de fondo
         
-        # Slider para elegir dificultad
-        self.slider_dificultad = tk.Scale(menu_frame, from_=0, to=20, orient=tk.HORIZONTAL, length=300)
-        self.slider_dificultad.set(5) # Valor inicial recomendado
-        self.slider_dificultad.pack(pady=5)
-        
-        lbl_info_dif = tk.Label(menu_frame, text="(0=Fácil, 5=Intermedio, 20=Imposible)", font=("Arial", 9, "italic"))
-        lbl_info_dif.pack(pady=5)
-
-        # Botón VS CPU
-        btn_cpu = tk.Button(menu_frame, text=f"Jugador vs Stockfish{estado_sf}", font=("Arial", 16), 
-                            width=25, fg=color_sf, state=estado_btn,
-                            command=lambda: self.iniciar_juego("CPU"))
-        btn_cpu.pack(pady=10)
-        
-        if color_sf == "red":
-            tk.Label(menu_frame, text="⚠ Coloca 'stockfish.exe' en la carpeta para activar la IA", fg="red").pack()
-
-    def iniciar_juego(self, modo):
-        self.modo_juego = modo
-        # Guardamos el valor del slider
-        self.nivel_actual = self.slider_dificultad.get()
-        
-        self.board = chess.Board()
-        self.selected_square = None
-        self.juego_terminado = False
-        
-        for widget in self.root.winfo_children(): widget.destroy()
-        
-        main_layout = tk.Frame(self.root)
-        main_layout.pack(padx=10, pady=10, fill="both", expand=True)
-        
-        self.board_frame = tk.Frame(main_layout)
-        self.board_frame.pack(side=tk.LEFT)
-        
-        self.info_frame = tk.Frame(main_layout, width=250)
-        self.info_frame.pack(side=tk.RIGHT, fill="y", padx=20)
-        
-        tk.Button(self.info_frame, text="< Menú Principal", command=self.mostrar_menu, bg="#ffcccc").pack(fill="x", pady=5)
-        
-        modo_texto = f"Modo: {modo}"
-        if modo == "CPU":
-            modo_texto += f"\nNivel: {self.nivel_actual}/20"
-            
-        tk.Label(self.info_frame, text=modo_texto, font=("Arial", 12, "bold")).pack(pady=10)
-        
-        tk.Label(self.info_frame, text="Historial:").pack(anchor="w")
-        self.history_text = tk.Text(self.info_frame, width=25, height=20, state='disabled')
-        self.history_text.pack(pady=5)
-        
-        self.status_label = tk.Label(self.info_frame, text="Turno: Blancas", font=("Arial", 11), fg="blue")
-        self.status_label.pack(pady=10)
-        
-        self.crear_casillas()
-        self.actualizar_tablero()
-
-    def crear_casillas(self):
-        self.buttons = {}
-        for fila in range(8):
-            for col in range(8):
-                idx = chess.square(col, 7 - fila)
-                btn = tk.Button(self.board_frame, text="", font=("Arial", 28), width=2, height=1,
-                                command=lambda s=idx: self.on_click(s))
-                btn.grid(row=fila, column=col)
-                self.buttons[idx] = btn
-
-    def actualizar_tablero(self):
-        for idx in range(64):
-            piece = self.board.piece_at(idx)
-            btn = self.buttons[idx]
-            btn.config(text=self.pieces[piece.symbol()] if piece else "")
-            
-            fila = 7 - chess.square_rank(idx)
-            col = chess.square_file(idx)
-            color_base = self.color_claro if (fila + col) % 2 == 0 else self.color_oscuro
-            
-            if self.selected_square == idx:
-                btn.config(bg=self.color_resaltado)
-            elif self.board.is_check() and piece and piece.piece_type == chess.KING and piece.color == self.board.turn:
-                 btn.config(bg="#FF5555")
-            else:
-                btn.config(bg=color_base)
-        
-        if not self.juego_terminado:
-            turno = "Blancas" if self.board.turn == chess.WHITE else "Negras"
-            self.status_label.config(text=f"Turno: {turno}")
-
-    def agregar_historial(self, move_san):
-        n = self.board.fullmove_number
-        txt = f"{n}. {move_san} " if self.board.turn == chess.BLACK else f"{move_san}\n"
-        self.history_text.config(state='normal')
-        self.history_text.insert(tk.END, txt)
-        self.history_text.see(tk.END)
-        self.history_text.config(state='disabled')
-
-    def on_click(self, square):
-        if self.juego_terminado: return
-        if self.modo_juego == "CPU" and self.board.turn == chess.BLACK: return
-
-        if self.selected_square is None:
-            piece = self.board.piece_at(square)
-            if piece and piece.color == self.board.turn:
-                self.selected_square = square
-                self.actualizar_tablero()
-        else:
-            if square == self.selected_square:
-                self.selected_square = None
-            else:
-                move = chess.Move(self.selected_square, square)
-                if self.es_promocion(move): move.promotion = chess.QUEEN
-                
-                if move in self.board.legal_moves:
-                    self.ejecutar_movimiento(move)
-                    if self.modo_juego == "CPU" and not self.juego_terminado:
-                        self.root.after(100, self.movimiento_ia)
-                else:
-                    piece = self.board.piece_at(square)
-                    if piece and piece.color == self.board.turn:
-                        self.selected_square = square
+        if self.enabled:
+            try:
+                mixer.init()
+                # Cargar todos los sonidos en memoria
+                for key, filename in Config.SOUNDS.items():
+                    if os.path.exists(filename):
+                        # Usamos Sound para todo para tener mejor control de canales
+                        self.sounds[key] = mixer.Sound(filename)
+                        # Ajustar volúmenes
+                        if "bg" in key: self.sounds[key].set_volume(0.3)
+                        if "hurry" in key: self.sounds[key].set_volume(0.5)
+                        if "win" in key: self.sounds[key].set_volume(0.4)
                     else:
-                        self.selected_square = None
-            self.actualizar_tablero()
+                        print(f"⚠️ Falta audio: {filename}")
+            except Exception as e:
+                print(f"Error Pygame: {e}")
+                self.enabled = False
 
-    def ejecutar_movimiento(self, move):
-        san = self.board.san(move)
-        self.board.push(move)
-        self.agregar_historial(san)
-        self.selected_square = None
-        self.actualizar_tablero()
-        self.verificar_fin()
+    def play_effect(self, sound_key):
+        """Reproduce un efecto de sonido corto (encima de la música)."""
+        if self.enabled and sound_key in self.sounds:
+            self.sounds[sound_key].play()
 
-    def movimiento_ia(self):
-        if self.juego_terminado: return
-        self.status_label.config(text=f"Stockfish (Nivel {self.nivel_actual}) pensando...")
-        self.root.update()
+    def play_background(self, sound_key):
+        """Reproduce música de fondo (detiene la anterior)."""
+        if not self.enabled: return
+        
+        self.stop_background() # Parar lo que sonaba antes
+        
+        if sound_key in self.sounds:
+            self.current_bg = self.sounds[sound_key]
+            # loops=-1 hace que se repita infinitamente
+            self.current_bg.play(loops=-1)
 
-        mejor_move = None
+    def stop_background(self):
+        """Detiene solo la música de fondo."""
+        if self.current_bg:
+            self.current_bg.stop()
+            self.current_bg = None
+
+    def stop_all(self):
+        """Detiene todo el audio."""
+        if self.enabled:
+            mixer.stop()
+
+# =========================================================
+# LÓGICA DEL JUEGO
+# =========================================================
+class GameLogic:
+    def __init__(self):
+        self.score = 0
+        self.high_score = self._load_record()
+        self.current_answer = ""
+        self.simon_says = False
+        self.last_country = "" # Para detectar Perú/España
+        
+        # Datos ampliados para probar los audios
+        self.datos = {
+            "palabras": ["python", "código", "java", "meme", "anime", "gato"],
+            "capitales": [
+                {"pais": "España", "respuesta": "madrid"},
+                {"pais": "Perú", "respuesta": "lima"},
+                {"pais": "Francia", "respuesta": "paris"},
+                {"pais": "Japón", "respuesta": "tokio"},
+                {"pais": "Italia", "respuesta": "roma"}
+            ]
+        }
+
+    def _load_record(self) -> int:
+        if not os.path.exists(Config.FILE_RECORD): return 0
         try:
-            # Configurar motor con el nivel elegido
-            with chess.engine.SimpleEngine.popen_uci(self.ruta_stockfish) as engine:
-                # AQUÍ ESTÁ LA MAGIA: Configuramos "Skill Level"
-                engine.configure({"Skill Level": self.nivel_actual})
-                
-                # Tiempo de pensamiento: Reducido para niveles bajos, mayor para altos
-                tiempo = 0.1 if self.nivel_actual < 5 else 0.5
-                
-                result = engine.play(self.board, chess.engine.Limit(time=tiempo))
-                mejor_move = result.move
-        except Exception as e:
-            print(f"Error engine: {e}")
-            # Fallback a random si falla
-            moves = list(self.board.legal_moves)
-            mejor_move = random.choice(moves)
+            with open(Config.FILE_RECORD, "r") as f:
+                return int(f.read().strip())
+        except: return 0
 
-        self.ejecutar_movimiento(mejor_move)
-
-    def es_promocion(self, move):
-        p = self.board.piece_at(move.from_square)
-        if p and p.piece_type == chess.PAWN:
-            rank = chess.square_rank(move.to_square)
-            if (p.color == chess.WHITE and rank == 7) or (p.color == chess.BLACK and rank == 0):
-                return True
+    def save_record(self) -> bool:
+        if self.score > self.high_score:
+            self.high_score = self.score
+            with open(Config.FILE_RECORD, "w") as f: f.write(str(self.high_score))
+            return True
         return False
 
-    def verificar_fin(self):
-        if self.board.is_game_over():
-            self.juego_terminado = True
-            res = self.board.result()
-            winner = "Nadie"
-            if self.board.is_checkmate():
-                winner = "Negras" if self.board.turn == chess.WHITE else "Blancas"
-                msg = f"¡Jaque Mate! Ganan: {winner}"
+    def generate_turn(self) -> Tuple[str, bool]:
+        self.last_country = "" # Reset
+        tipo = random.choice(['math', 'word', 'capital'])
+        
+        # Ajustamos probabilidad para que salgan más países y probar audios
+        if random.random() < 0.4: tipo = 'capital' 
+
+        if tipo == 'math':
+            a, b = random.randint(1, 20), random.randint(1, 20)
+            text_base = f"calcula {a} + {b}"
+            self.current_answer = str(a + b)
+            
+        elif tipo == 'word':
+            word = random.choice(self.datos["palabras"])
+            text_base = f"escribe '{word}'"
+            self.current_answer = word
+            
+        elif tipo == 'capital':
+            item = random.choice(self.datos["capitales"])
+            pais = item["pais"]
+            self.current_answer = item["respuesta"]
+            text_base = f"¿capital de {pais}?"
+            self.last_country = pais # Guardamos para el audio
+
+        self.simon_says = random.choice([True, False])
+        display = f"Simón dice: {text_base}" if self.simon_says else text_base.capitalize()
+        return display, self.simon_says
+
+    def check_answer(self, user_input: str) -> Tuple[bool, str]:
+        if self.simon_says:
+            if user_input.lower().strip() == self.current_answer:
+                self.score += 1
+                return (True, "")
+            return (False, f"Era '{self.current_answer}'")
+        return (False, "¡Simón no dijo nada!")
+
+    def check_pass(self) -> Tuple[bool, str]:
+        if self.simon_says:
+            return (False, "¡Simón ordenó hacerlo!")
+        self.score += 1
+        return (True, "")
+
+# =========================================================
+# APP PRINCIPAL
+# =========================================================
+class SimonDiceApp:
+    def __init__(self, root: tk.Tk):
+        self.root = root
+        self.sound = SoundManager()
+        self.timer_id = None
+        self._setup_window()
+        self.show_menu()
+
+    def _setup_window(self):
+        self.root.title(Config.TITLE)
+        self.root.geometry(Config.GEOMETRY)
+        self.root.configure(bg=Config.BG_COLOR)
+
+    def clear_window(self):
+        self.stop_timer()
+        self.sound.stop_all() # Parar sonidos al cambiar pantalla
+        for widget in self.root.winfo_children():
+            widget.destroy()
+
+    # --- MENÚ ---
+    def show_menu(self):
+        self.clear_window()
+        frame = tk.Frame(self.root, bg=Config.BG_COLOR)
+        frame.pack(expand=True, fill="both", padx=20, pady=20)
+
+        tk.Label(frame, text="🤡 SIMÓN DICE 🤡", font=("Helvetica", 28, "bold"), 
+                 bg=Config.BG_COLOR, fg="#FF5722").pack(pady=20)
+        
+        tk.Label(frame, text="Edición Audios Latinos/Memes", font=("Helvetica", 12), 
+                 bg=Config.BG_COLOR).pack()
+
+        btn = tk.Button(frame, text="JUGAR AHORA", command=self.start_game_session,
+                        bg="#4CAF50", fg="white", font=("Helvetica", 16, "bold"), height=2)
+        btn.pack(pady=50, fill="x")
+
+    # --- JUEGO ---
+    def start_game_session(self):
+        self.clear_window()
+        self.logic = GameLogic()
+        self.is_playing = True
+        self._build_game_ui()
+        self.start_new_turn()
+
+    def _build_game_ui(self):
+        # UI similar a la anterior
+        frame_top = tk.Frame(self.root, bg=Config.BG_COLOR)
+        frame_top.pack(fill="x", pady=10)
+        
+        self.lbl_score = tk.Label(frame_top, text="Pts: 0", font=("Helvetica", 14), bg=Config.BG_COLOR)
+        self.lbl_score.pack(side="left", padx=20)
+        
+        self.lbl_timer = tk.Label(frame_top, text="15s", font=("Helvetica", 16, "bold"), fg="red", bg=Config.BG_COLOR)
+        self.lbl_timer.pack(side="right", padx=20)
+
+        self.lbl_instruction = tk.Label(self.root, text="", font=("Helvetica", 20, "bold"), 
+                                        wraplength=500, bg=Config.BG_COLOR, height=4)
+        self.lbl_instruction.pack(pady=10)
+
+        self.entry = tk.Entry(self.root, font=("Helvetica", 18), justify='center')
+        self.entry.pack(pady=10)
+        self.entry.bind('<Return>', lambda e: self.action_submit())
+
+        frame_btns = tk.Frame(self.root, bg=Config.BG_COLOR)
+        frame_btns.pack(pady=20)
+        
+        tk.Button(frame_btns, text="¡HACERLO!", bg="#4CAF50", fg="white", font="bold", 
+                  command=self.action_submit, width=12, height=2).pack(side="left", padx=10)
+        tk.Button(frame_btns, text="PASAR", bg="#FF9800", fg="white", font="bold", 
+                  command=self.action_pass, width=12, height=2).pack(side="left", padx=10)
+
+    def start_new_turn(self):
+        if not self.root.winfo_exists(): return
+        self.is_playing = True
+        
+        # 1. Generar Lógica
+        text, _ = self.logic.generate_turn()
+        self.lbl_instruction.config(text=text, fg="black")
+        
+        self.entry.delete(0, tk.END)
+        self.entry.config(state='normal')
+        self.entry.focus()
+
+        # 2. SISTEMA DE AUDIO INTELIGENTE
+        # Paramos la música anterior
+        self.sound.stop_background()
+        
+        # Chequeos especiales según el texto generado
+        if self.logic.last_country == "España":
+            self.sound.play_background("special_espana")
+        elif self.logic.last_country == "Perú":
+            self.sound.play_background("special_peru")
+        else:
+            # Easter egg: 5% probabilidad de Onichan
+            if random.random() < 0.05:
+                self.sound.play_effect("easter_egg")
+                # Ponemos música suave de fondo tras el onichan
+                self.root.after(1500, lambda: self.sound.play_background("bg_normal"))
             else:
-                msg = "Tablas / Empate"
-            messagebox.showinfo("Fin", f"{msg}\nResultado: {res}")
+                # Música normal aleatoria (50% probabilidad)
+                bg = "bg_normal" if random.random() > 0.5 else "bg_eater"
+                self.sound.play_background(bg)
+
+        # Iniciar Timer
+        self.timer_left = Config.TIME_LIMIT
+        self.stop_timer()
+        self._update_timer()
+
+    def _update_timer(self):
+        if not self.is_playing: return
+        
+        self.lbl_timer.config(text=f"⏱ {self.timer_left}s")
+        
+        # EVENTO: Queda poco tiempo (Majora's Mask)
+        if self.timer_left == 5:
+            self.sound.stop_background() # Paramos la música tranquila
+            self.sound.play_effect("hurry") # Pánico
+
+        if self.timer_left <= 0:
+            self.handle_game_over("¡SE ACABÓ EL TIEMPO!")
+        else:
+            self.timer_left -= 1
+            self.timer_id = self.root.after(1000, self._update_timer)
+
+    def stop_timer(self):
+        if self.timer_id:
+            self.root.after_cancel(self.timer_id)
+            self.timer_id = None
+
+    # --- ACCIONES ---
+    def action_submit(self):
+        if not self.is_playing: return
+        self.stop_timer()
+        success, msg = self.logic.check_answer(self.entry.get())
+        self._process_result(success, msg)
+
+    def action_pass(self):
+        if not self.is_playing: return
+        self.stop_timer()
+        success, msg = self.logic.check_pass()
+        self._process_result(success, msg)
+
+    def _process_result(self, success, fail_msg):
+        self.sound.stop_background() # Parar música de fondo (especialmente la de "hurry")
+        
+        if success:
+            # EVENTO: 50 Puntos
+            if self.logic.score == 50:
+                self.sound.play_effect("epic_50")
+                messagebox.showinfo("¡WOW!", "¡50 PUNTOS! ¡ERES UN DIOS!")
+            else:
+                self.sound.play_effect("win")
+            
+            self.lbl_score.config(text=f"Pts: {self.logic.score}")
+            self.root.after(1500, self.start_new_turn) # Esperar un poco para oír el audio
+        else:
+            self.sound.play_effect("fail") # Bocina
+            self.handle_game_over(fail_msg)
+
+    def handle_game_over(self, reason):
+        self.is_playing = False
+        new_record = self.logic.save_record()
+        
+        # Esperar 1 segundo tras el fallo para poner la música triste
+        self.root.after(1000, lambda: self.sound.play_background("gameover"))
+
+        self.lbl_instruction.config(text=f"💀 FIN 💀\n{reason}", fg="red")
+        self.entry.config(state='disabled')
+        
+        msg = f"Récord Nuevo: {self.logic.high_score}" if new_record else f"Puntos: {self.logic.score}"
+        
+        # Usamos un frame sobrepuesto en lugar de messagebox para no bloquear el audio
+        frame_over = tk.Frame(self.root, bg="#333", relief="raised", bd=5)
+        frame_over.place(relx=0.5, rely=0.5, anchor="center", width=400, height=200)
+        
+        tk.Label(frame_over, text="¡PERDISTE!", fg="red", bg="#333", font=("Arial", 20, "bold")).pack(pady=10)
+        tk.Label(frame_over, text=msg, fg="white", bg="#333", font=("Arial", 14)).pack(pady=10)
+        
+        tk.Button(frame_over, text="Reintentar", command=self.start_game_session, bg="white").pack(pady=5)
+        tk.Button(frame_over, text="Salir", command=self.root.destroy, bg="red", fg="white").pack(pady=5)
 
 if __name__ == "__main__":
+    if not _PYGAME_AVAILABLE:
+        print("ADVERTENCIA: Instala pygame (pip install pygame) para oír los audios.")
+    
     root = tk.Tk()
-    app = AjedrezApp(root)
+    app = SimonDiceApp(root)
     root.mainloop()
