@@ -1,0 +1,16 @@
+{
+    "palabras": [
+        "python", "código", "java", "meme", "anime", 
+        "gato", "perro", "hola", "ventana", "teclado"
+    ],
+    "capitales": [
+        {"pais": "España", "respuesta": "madrid"},
+        {"pais": "Perú", "respuesta": "lima"},
+        {"pais": "Japón", "respuesta": "tokio"},
+        {"pais": "Francia", "respuesta": "paris"},
+        {"pais": "Italia", "respuesta": "roma"},
+        {"pais": "Argentina", "respuesta": "buenos aires"},
+        {"pais": "Alemania", "respuesta": "berlin"},
+        {"pais": "Portugal", "respuesta": "lisboa"}
+    ]
+}
