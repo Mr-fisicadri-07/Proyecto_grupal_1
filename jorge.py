@@ -16,7 +16,7 @@ except ImportError:
 # 1. CONFIGURACIÓN
 # =========================================================
 class Config:
-    TITLE = "Simón Dice: Final Edition (No Keys)"
+    TITLE = "Simón Dice: Final Edition"
     GEOMETRY = "600x700"
     BG_COLOR = "#f0f0f0"
     
