@@ -1,0 +1,21 @@
+{
+    "window": {
+        "title": "Simón Dice: Final Edition",
+        "geometry": "600x700",
+        "bg_color": "#f0f0f0"
+    },
+    "gameplay": {
+        "pass_lock_ms": 500
+    },
+    "sounds": {
+        "bg_normal": "tiempo_wii",
+        "bg_rare": "snake_eater",
+        "hurry": "hurry",
+        "fail_1": "fallo",
+        "fail_2": "derrota",
+        "special_peru": "peru",
+        "special_espana": "espana",
+        "special_japon": "onichan",
+        "epic_50": "epic_50"
+    }
+}
