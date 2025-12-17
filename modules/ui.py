@@ -175,9 +175,9 @@ class SimonDiceApp:
             self.entry.config(state='disabled')
             self.btn_pass.config(state='disabled')
             
-            if self.logic.score == 50:
-                self.sound_manager.play_effect("epic_50")
-                messagebox.showinfo("¡INCREÍBLE!", "¡50 PUNTOS!")
+            if self.logic.score == 15:
+                self.sound_manager.play_effect("epic_15")
+                messagebox.showinfo("¡INCREÍBLE!", "¡15 PUNTOS!")
             
             self.lbl_score.config(text=f"Pts: {self.logic.score}")
             self.root.after(2000, self.start_new_turn)

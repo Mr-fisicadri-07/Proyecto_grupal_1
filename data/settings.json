@@ -1,6 +1,6 @@
 {
     "window": {
-        "title": "Simón Dice: Final Edition",
+        "title": "Simón Dice",
         "geometry": "600x700",
         "bg_color": "#f0f0f0"
     },
@@ -16,6 +16,6 @@
         "special_peru": "peru",
         "special_espana": "espana",
         "special_japon": "onichan",
-        "epic_50": "epic_50"
+        "epic_15": "epic_15"
     }
 }
