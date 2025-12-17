@@ -142,3 +142,39 @@ settings.json: Cambia el tamaño de la ventana, el color de fondo o reasigna los
 Desarrollado como proyecto educativo para demostrar buenas prácticas de programación en Python, uso de Tkinter y manejo de archivos JSON.
 
 ¡Disfruta del juego y supera tu récord! 🤡
+
+
+
+
+
+
+
+
+""" Este programa es una versión avanzada del juego "Simón Dice" con múltiples tipos de preguntas.
+Incluye matemáticas, palabras y capitales de países, con una interfaz gráfica mejorada y sonidos.
+Al iniciar, muestra un menú con las reglas del juego. Una vez dentro del juego, el jugador debe decidir
+si obedecer o no las órdenes de "Simón" basándose en si la instrucción comienza con "Simón dice".
+Si el jugador responde correctamente, gana puntos; si falla o se acaba el tiempo, pierde.
+Cuando el juego termina, se muestra el puntaje final si se ha establecido un nuevo récord y una opcion
+para reiniciar el "Simón dice".
+El usuario podrá volver al menú principal en cualquier momento durante el juego.
+
+El juego utiliza un archivo JSON para cargar las preguntas y respuestas, y guarda el récord del jugador
+en un archivo de texto. Tambien hemos utilizado las bibliotecas tkinter, random, os, threading y sys.
+Hemos utilizado tkinker para la interfaz gráfica, random para la generación de números aleatorios,
+os para la gestión de archivos, threading para manejar sonidos sin bloquear la interfaz, y sys para la detección del sistema operativo.
+
+Por otro lado, hemos implementado un gestor de sonido que utiliza la biblioteca winsound en Windows para reproducir sonidos simples.
+
+El código está estructurado en clases para separar la lógica del juego, la gestión de sonidos y la interfaz gráfica.
+
+Ejemplo de juego:
+1. El jugador inicia el juego y ve las reglas en el menú principal.
+2. El juego genera una instrucción, por ejemplo: "Simón dice: calcula 5 + 3".
+3. El jugador debe ingresar "8" y presionar "¡Hacerlo!" para ganar un punto en menos de 15 segundos.
+4.
+Si acierta:
+    - Gana un punto y recibe una nueva instrucción.
+Si falla o se acaba el tiempo:
+    - El juego termina y se muestra el puntaje final. Se da la opción de reiniciar o volver al menú principal.
+"""
