@@ -17,13 +17,27 @@ class SoundManager:
         except Exception as e:
             print(f"❌ Error iniciando mixer: {e}")
 
+    def _find_assets_folder(self):
+        """Busca la carpeta assets en el directorio actual o en el superior."""
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        
+        path = os.path.join(current_dir, "..", "assets")
+        
+        return os.path.abspath(path) if os.path.exists(path) else None  
+
     def _load_sounds(self):
-        """Carga los audios definidos en settings.json"""
+        assets_folder = self._find_assets_folder()
+        
+        if not assets_folder:
+            print(f"❌ ERROR CRÍTICO: No se encuentra la carpeta 'assets'.")
+            print(f"   (Se buscó cerca de: {os.path.dirname(os.path.abspath(__file__))})")
+            return
+
         sound_map = Config.SETTINGS.get("sounds", {})
         
         for key, filename in sound_map.items():
-            # Construye la ruta: carpeta assets / nombre archivo .mp3
-            path = os.path.join(Config.ASSETS_DIR, f"{filename}.mp3")
+            filename_clean = os.path.basename(filename).replace("assets/", "").replace(".mp3", "")
+            path = os.path.join(assets_folder, f"{filename_clean}.mp3")
             
             if os.path.exists(path):
                 try:
@@ -32,9 +46,9 @@ class SoundManager:
                     if "hurry" in key: sound.set_volume(0.6)
                     self.sounds[key] = sound
                 except Exception as e:
-                    print(f"Error cargando {path}: {e}")
+                    print(f"❌ Error archivo dañado {filename_clean}: {e}")
             else:
-                print(f"⚠️ Audio no encontrado: {path}")
+                print(f"⚠️ Audio faltante: {filename_clean}.mp3")
 
     def play_effect(self, sound_key: str):
         if self.enabled and sound_key in self.sounds:
