@@ -22,6 +22,7 @@ class Config:
             with open(os.path.join(cls.DATA_DIR, 'gamedata.json'), 'r', encoding='utf-8') as f:
                 cls.GAME_CONTENT = json.load(f)
                 
+        # Manejo de errores críticos
         except FileNotFoundError as e:
             print(f"❌ Error crítico: No se encuentra el archivo de configuración: {e}")
             # Valores por defecto de emergencia para que no crashee inmediatamente

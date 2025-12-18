@@ -8,6 +8,7 @@ class SoundManager:
         self.sounds = {}
         self.current_bg = None 
         
+        # Inicializamos el mixer de Pygame
         try:
             mixer.init()
             self.enabled = True
@@ -26,6 +27,7 @@ class SoundManager:
         return os.path.abspath(path) if os.path.exists(path) else None  
 
     def _load_sounds(self):
+        '''Carga los archivos de audio según la configuración.'''
         assets_folder = self._find_assets_folder()
         
         if not assets_folder:
@@ -33,12 +35,15 @@ class SoundManager:
             print(f"   (Se buscó cerca de: {os.path.dirname(os.path.abspath(__file__))})")
             return
 
+        # Cargamos los sonidos definidos en settings.json
         sound_map = Config.SETTINGS.get("sounds", {})
         
+        # Cargamos cada archivo
         for key, filename in sound_map.items():
             filename_clean = os.path.basename(filename).replace("assets/", "").replace(".mp3", "")
             path = os.path.join(assets_folder, f"{filename_clean}.mp3")
             
+            # Verificamos si el archivo existe
             if os.path.exists(path):
                 try:
                     sound = mixer.Sound(path)
@@ -50,10 +55,12 @@ class SoundManager:
             else:
                 print(f"⚠️ Audio faltante: {filename_clean}.mp3")
 
+    # Reproduce un efecto de sonido una vez
     def play_effect(self, sound_key: str):
         if self.enabled and sound_key in self.sounds:
             self.sounds[sound_key].play()
 
+    # Reproduce música de fondo en loop
     def play_background(self, sound_key: str):
         if not self.enabled: return
         self.stop_all() 
@@ -61,6 +68,7 @@ class SoundManager:
             self.current_bg = self.sounds[sound_key]
             self.current_bg.play(loops=-1)
 
+    # Detiene toda la música y efectos
     def stop_all(self):
         if self.enabled:
             mixer.stop()
