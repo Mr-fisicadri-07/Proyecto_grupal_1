@@ -1,35 +1,3 @@
-ESTO ES IA, PERO POR SI OS SIRVE PARA REDACTAR ALGO INTERESANTE
-
-🤡 Simón Dice: Final Edition
-
-¡Bienvenido a Simón Dice: Final Edition! Una reimaginación moderna y desafiante del clásico juego infantil, desarrollada en Python utilizando Tkinter y una arquitectura modular robusta.
-
-Este proyecto no se trata de luces y colores, sino de velocidad mental, cálculo rápido y cultura general, todo bajo la presión de un temporizador implacable y la constante duda de: ¿Lo dijo Simón?
-
-🚀 Características Principales
-
-Arquitectura Modular (MVC): Código limpio y organizado, separando la lógica del juego, la interfaz gráfica y la gestión de datos.
-
-Configuración Externa (JSON): Todos los datos del juego (preguntas, capitales, configuración de ventana) se cargan desde archivos .json, permitiendo modificar el juego sin tocar el código fuente.
-
-Sistema de Audio Dinámico:
-
-Música de fondo que cambia según el contexto (países específicos).
-
-Efectos de sonido para tensión ("hurry up"), victoria y derrota.
-
-Gestor de sonido robusto basado en pygame.
-
-Procesamiento de Texto Inteligente: El juego es capaz de entender respuestas con o sin tilde y en mayúsculas o minúsculas (ej: "Perú" = "peru").
-
-Desafíos Variados:
-
-🧮 Matemáticas: Sumas rápidas.
-
-⌨️ Escritura: Velocidad de mecanografía.
-
-🌍 Geografía: Capitales del mundo (con eventos de audio especiales para España, Perú y Japón).
-
 📋 Requisitos del Sistema
 
 Python 3.8 o superior.
